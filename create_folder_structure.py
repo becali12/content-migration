@@ -3,8 +3,6 @@ from google_sheet_operations import get_first_col, get_all_sheet_values
 from store_md_files import get_all_articles
 from process_articles import remove_punctuation
 
-# for images: go to google sheet, search for all possible values on col 1 and create a folder under
-# /static/img/help-center-images/ for each of them
 
 def create_directory(path, folder):
     try:
