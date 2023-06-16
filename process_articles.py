@@ -36,6 +36,7 @@ def download_and_store_images(links, category, article_title):
         url = link[1]
         filename = link[0]
         filename = filename.replace(' ', '-')
+        filename = filename.replace("'", '-')
         response = requests.get(url)
         if response.status_code == 200:
             content_type = response.headers.get("content-type")
@@ -92,6 +93,25 @@ def replace_links(md_file, old_links, new_links):
 
 def find_image_links(md_file):
     pattern = r"!\[.*?\]\(https://support.metamask.io/hc/article_attachments/\d+\)"
+    pattern2 = r"!\[.*?\]\(https://support.metamask.io/hc/article_attachments/\d+"
+
+    # as seen with the article links, the image links also have 2 possible formats
+    # whenever we find a link that's in this format:
+    # https://support.metamask.io/hc/article_attachments/13921484870939/text-here-
+    # we delete extra characters until https://support.metamask.io/hc/article_attachments/13921484870939 remains
+    matches = re.finditer(pattern2, md_file)
+    positions_to_delete = []
+
+    for match in matches:
+        next_character_index = match.end()
+        if next_character_index < len(md_file) and md_file[next_character_index] != ')':
+            while md_file[next_character_index] != ')':
+                positions_to_delete.append(next_character_index)
+                next_character_index += 1
+
+    for position in reversed(positions_to_delete):
+        md_file = md_file[:position] + md_file[position + 1:]
+
     links = re.findall(pattern, md_file)
     links_list = []
     if links:
@@ -106,15 +126,31 @@ def find_image_links(md_file):
                 print("Couldn't get link or image title using regex - in find_image_links")
     # else:
     #     print('No image links were found in the article - in find_image_links')
-
-    return links_list
+    return links_list, md_file
 
 
 # returns a list of all article-reference links within an article
 def find_article_links(md_file):
     pattern = r"https://support.metamask.io/hc/en-us/articles/\d+"
     links = re.findall(pattern, md_file)
-    return links
+
+    # not all article reference links follow this format (https://support.metamask.io/hc/en-us/articles/360057536611)
+    # some of them are (https://support.metamask.io/hc/en-us/articles/360057536611-article-title)
+    # so we delete everything after the last digit until the first ')'
+    matches = re.finditer(pattern, md_file)
+    positions_to_delete = []
+
+    for match in matches:
+        next_character_index = match.end()
+        if next_character_index < len(md_file) and md_file[next_character_index] != ')':
+            while md_file[next_character_index] != ')':
+                positions_to_delete.append(next_character_index)
+                next_character_index += 1
+
+    for position in reversed(positions_to_delete):
+        md_file = md_file[:position] + md_file[position + 1:]
+
+    return links, md_file
 
 
 def get_article_title_by_id(articles, article_id):
@@ -127,7 +163,7 @@ def get_article_title_by_id(articles, article_id):
 
 def replace_article_links(md_file, old_links, articles, sheet_data):
     for link in old_links:
-        # all links follow this format: https://support.metamask.io/hc/en-us/articles/360057536611
+        # all links now follow this format: https://support.metamask.io/hc/en-us/articles/360057536611
         referenced_article_id = link[46:]
         referenced_article_title = get_article_title_by_id(articles, referenced_article_id)
         if referenced_article_title:
@@ -156,11 +192,11 @@ def preserve_title(md_file, title, new_title):
 #   search for links that follow this format: https://support.metamask.io/hc/article_attachments/13921484870939
 #   download the attachments from ZD api and store them into ../category_name/article/image
 #   replace those links with ../category_name/article/image
-# feed the modified articles to process_article_links (from main.py)
+#   search for article referencing links and change them
+#   store the mdx in docs/{category}/article.mdx
 def process_articles():
     articles = get_all_articles()
     sheet_data = get_all_sheet_values()
-
     # for article in articles:
     for article in tqdm(articles, desc='Processing articles', unit='article'):
         original_title = title = article['title']
@@ -173,12 +209,12 @@ def process_articles():
             md_file = preserve_title(md_file, original_title, title)
 
             # modify article reference links
-            article_links = find_article_links(md_file)
+            article_links, md_file = find_article_links(md_file)
             if article_links:
                 md_file = replace_article_links(md_file, article_links, articles, sheet_data)
 
             # modify image links
-            links = find_image_links(md_file)
+            links, md_file = find_image_links(md_file)
             if len(links) != 0:
                 updated_links = download_and_store_images(links, category, title)
                 md_file = replace_links(md_file, links, updated_links)
