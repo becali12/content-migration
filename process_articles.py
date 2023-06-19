@@ -187,7 +187,6 @@ def preserve_title(md_file, title, new_title):
     return new_md
 
 
-
 # for every article:
 #   search for links that follow this format: https://support.metamask.io/hc/article_attachments/13921484870939
 #   download the attachments from ZD api and store them into ../category_name/article/image

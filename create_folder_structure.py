@@ -11,6 +11,17 @@ def create_directory(path, folder):
     except FileExistsError:
         print(f"Folder {folder} already exists in {path}")
 
+
+def create_index_file(original_name, slug, sidebar_position):
+    file_content = f'---\ntitle: {original_name}\nslug: {slug}\nsidebar_position: {sidebar_position}\n---'
+    file_path = f'./docs/{slug}/index.mdx'
+
+    with open(file_path, 'w') as file:
+        file.write(file_content)
+
+    return sidebar_position + 1
+
+
 def get_categories():
     categories = get_first_col()
     unique_categories = list(set(categories[1:]))
@@ -27,6 +38,7 @@ def get_article_category(article, sheet_data):
     return None
 
 def create_folder_structure():
+    sidebar_position = 1
     create_directory('./', 'static')
     create_directory('./', 'docs')
     create_directory('./static/', 'img')
@@ -36,9 +48,11 @@ def create_folder_structure():
     articles = get_all_articles()
 
     for category in categories:
+        original_name = category
         category = category.replace(' ', '-')
         create_directory('./docs/', category)
         create_directory('./static/img/help-center-images/', category)
+        sidebar_position = create_index_file(original_name, category, sidebar_position)
 
     sheet_data = get_all_sheet_values()
     for article in articles:
